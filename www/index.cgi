@@ -5,22 +5,24 @@ use warnings;
 use DBI;
 use CGI qw(param);
 use locale;
-    use POSIX qw(locale_h);
-    setlocale(LC_CTYPE, 'ru_RU.CP1251');
-    setlocale(LC_ALL, 'ru_RU.CP1251');
+use POSIX qw(locale_h);
+setlocale(LC_CTYPE, 'ru_RU.CP1251');
+setlocale(LC_ALL, 'ru_RU.CP1251');
+use Config::Tiny;
+use 5.010;
 
-my $driver  = "Pg"; 
-my $host='localhost';
-my $port='5432';
-my $user='vadim';
-my $pass='0291094';
-my $dbname="postgres";
+
+my $config = Config::Tiny->read( '../config.ini' );
+my $user = $config->{connect}->{user};
+my $driver  = $config->{connect}->{driver};
+my $host = $config->{connect}->{host};
+my $port = $config->{connect}->{port};
+my $pass = $config->{connect}->{pass};
+my $dbname = $config->{connect}->{dbname};
 my $dsn = "DBI:$driver:dbname = $dbname";
 
-# Получаем поисковый запрос
 my $search = param('search') || undef;
 
-# Сразу отправляем заголовок браузеру
 print "Content-type: text/html; charset=windows-1251 ";
 # Форма запроса
 print '<form action='' method=get>';
@@ -31,26 +33,37 @@ print '</form>';
 unless ($search) {print 'Результатов запроса - 0'; exit}
 # На всякий случай "чистим" полученные данные
 $search =~s /[^ws-]/ /g;
-# "Сжимаем" пробельные символы
+
+print "tet";
+
 $search =~s /s+/ /g;
 # Подключаемся к базе данных
 
 my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1 }) or die $DBI::errstr;
 # Формируем запрос
-my $sql = "SELECT
-                created, id, int_id,str,status
-           FROM log.message
-           LIMIT 100";
-my $sth = $dbh->prepare($sql);
+
+my $sth = $dbh->prepare(
+"with t as (
+select t1.created,t1.str,t2.created,t2.str from log.message t1, log.log t2
+where t1.int_id=t2.int_id
+order by t1.int_id,t2.int_id
+)
+select * from t"
+) or die "prepare statement failed: $dbh->errstr()";
+
 $sth->execute() || die $DBI::errstr;
 # Устанавливаем счетчик
 my $i = 1;
 while (my $row = $sth->fetchrow_hashref()) {
-# Печатаем строку результата
-    print $i, ' - <a href="', $$row{'url'}, '">', $$row{'title'}, '<a><br>',
-          $$row{'description'}, '<br><br>';
+
+ print $i,$$row{'created'},'  ',
+          $$row{'id'}, '  '  ,
+          $$row{'int_id'},'  ',
+          $$row{'str'}, '  ',
+          $$row{'status'}, '  ';
     $i++
 }
+
 $sth->finish();
 # Отключаемся от базы данных
 $dbh->disconnect();
