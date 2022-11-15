@@ -48,12 +48,9 @@ print "<input type=submit value=search>";
 print "</form>";
 
 my $sth = $dbh->prepare(
-"with t as (
-select t1.created,t1.str,t2.created,t2.str from log.message t1, log.log t2
+"select t1.created,t1.str,t2.created,t2.str from log.message t1, log.log t2
 where t1.int_id=t2.int_id
-order by t1.int_id,t2.int_id
-)
-select * from t"
+order by t1.int_id, t2.int_id"
 ) or die "prepare statement failed: $dbh->errstr()";
 
 $sth->execute() or die "execution failed: $dbh->errstr()"; 
